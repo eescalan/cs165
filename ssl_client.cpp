@@ -97,32 +97,52 @@ int main(int argc, char** argv)
 	// 2. Send the server a random number
 	printf("2.  Sending challenge to the server...\n");
 	
-	char rbuf[16];
-	RAND_seed(rbuf, 16);
-	int bits = 1024;
-	unsigned long e = 4;
+	unsigned char rbuf[16];
+	//RAND_seed(rbuf, 16);
+	//int bits = 16;
+	//unsigned long e = 3;
+	
+	if (!RAND_bytes(rbuf, sizeof(rbuf)) ){ //secure PRNG
+		printf("OpenSSL error\n");
+	}
+	/*
+	printf("%i\n", sizeof(rbuf) );
+	for (int i = 0; i < sizeof(rbuf); i++){
+		printf("%i\n", rbuf[i]);
+	}
 		//printf("e: %i\n", e);
+	*/
 	
-	RSA* rsa;
-	rsa = RSA_generate_key(bits, e, NULL, NULL);
+	//RSA* rsa;
+	//rsa = RSA_generate_key(512, RSA_F4, NULL, NULL);
+	//	printf("rsa key = %d\n", rsa);
+//
+	FILE *pubfile = fopen("rsapublickey.pem", "r");
+	RSA* pubkey = 0;
+	pubkey = PEM_read_RSAPublicKey(pubfile, NULL, NULL, NULL);
+
+	unsigned char enc[16];
 	
-	int prn = 31337;
-	int challenge = pow(prn, 3533);
-	challenge = challenge % 11413;
-		//int challenge = 12345;
-    
-    //string randomNumber="31337";
-    	stringstream ss;
-    	ss << challenge;
-	string randomNumber = ss.str();
+	RSA_public_encrypt(sizeof(rbuf), rbuf, enc, pubkey, RSA_PKCS1_PADDING);
+
+	//for (int i = 0; i < sizeof(enc); i++){
+	//	printf("%i\n", enc[i]);
+	//}
+	RSA_free(pubkey);
+//
+
+    string randomNumber="31337";
+       	//int challenge  = rbuf[rand() % sizeof(rbuf)];
+    	//stringstream ss;
+    	//ss << challenge;
+	//string randomNumber = ss.str();
 		printf("Challenge: %s \n", randomNumber.c_str());
 	//SSL_write
 	int bufsize = strlen(randomNumber.c_str());
 		printf("bufsize: %i \n", bufsize);
-	//int bufsize = 1024;
-	
+	//int bufsize = 1024;	
 	SSL_write(ssl, randomNumber.c_str(), bufsize);
-    
+	printf("HELLO");
     printf("SUCCESS.\n");
 	printf("    (Challenge sent: \"%s\")\n", randomNumber.c_str());
 

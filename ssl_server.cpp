@@ -113,6 +113,7 @@ int main(int argc, char** argv)
     
 	printf("DONE.\n");
 	printf("    (Challenge: \"%s\")\n", challenge.c_str());
+	
 
     //-------------------------------------------------------------------------
 	// 3. Generate the SHA1 hash of the challenge
