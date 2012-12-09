@@ -6,6 +6,7 @@
 //----------------------------------------------------------------------------
 #include <string>
 #include <time.h>
+#include <sstream>
 using namespace std;
 
 #include <openssl/ssl.h>	// Secure Socket Layer library
@@ -84,7 +85,6 @@ int main(int argc, char** argv)
 	}
 	SSL_set_accept_state(ssl);
 	SSL_set_bio(ssl, server, server);
-	printf("\n############\n");
 	if (SSL_accept(ssl) <= 0)
 	{
 		printf("Error doing SSL_accept(ssl).\n");
@@ -100,24 +100,42 @@ int main(int argc, char** argv)
 	printf("2. Waiting for client to connect and send challenge...");
     
     //SSL_read
-    string challenge="";
+    string randomNumber="";
     
-    	int bufsize = 5;
-    	char buf[bufsize];
+	FILE *privfile = fopen("rsaprivatekey.pem", "r");
+	RSA* privkey = PEM_read_RSAPrivateKey(privfile, NULL, NULL, NULL);
+	
+	FILE *pubfile = fopen("rsapublickey.pem", "r");
+	RSA* pubkey = PEM_read_RSA_PUBKEY(pubfile, NULL, NULL, NULL);
+    
+    	unsigned char* buf = (unsigned char*)malloc(RSA_size(pubkey));
+    	int bufsize = 128;
+    		printf("size of buf: %i\n", sizeof(buf));
 	SSL_read(ssl, buf, bufsize);
 		for(int x = 0; x < bufsize; x++){
-			printf("%c", buf[x]);
-			challenge = challenge + buf[x];
+		//	printf("%c", buf[x]);
+			//randomNumber = randomNumber + buf[x];
 		}
 	
     
 	printf("DONE.\n");
-	printf("    (Challenge: \"%s\")\n", challenge.c_str());
+	printf("    (Challenge: \"%i\")\n", buf[0]);
+	
+
+	unsigned char* dec = (unsigned char*)malloc(RSA_size(privkey));
+	
+	if (RSA_private_decrypt(RSA_size(privkey), (unsigned char*)buf, (unsigned char*)dec, privkey, RSA_PKCS1_PADDING) == -1){
+		printf("Failed decryption!\n");
+		fprintf(stderr, "OpenSSL error: %s\n", ERR_error_string(ERR_get_error(), NULL));
+		RSA_free(privkey);
+	}
+	
+	printf("decrypted: %i\n", dec[0]);
 	
 
     //-------------------------------------------------------------------------
 	// 3. Generate the SHA1 hash of the challenge
-	printf("3. Generating SHA1 hash...");
+	printf("3. Generating SHA1 hash...\n");
 
 	//BIO_new(BIO_s_mem());
 	//BIO_write
@@ -125,6 +143,19 @@ int main(int argc, char** argv)
 	//BIO_set_md;
 	//BIO_push;
 	//BIO_gets;
+	
+	int deChallenge = dec[0];
+	stringstream ss;
+	ss << deChallenge;
+	string challengeNumber = ss.str();
+		printf("hashing: %s\n", challengeNumber.c_str());
+	
+	unsigned char obuf[20];
+	SHA1((unsigned char*)challengeNumber.c_str(), sizeof(challengeNumber.c_str()), obuf);
+	printf("hash:\n");
+	for (int i = 0; i < 20; i++){
+		printf("%02x ", obuf[i]);
+	}
 
     int mdlen=0;
 	string hash_string = "";

@@ -74,7 +74,7 @@ int main(int argc, char** argv)
         print_errors();
 		exit(EXIT_FAILURE);
 	}
-	printf("\n############\n");
+
 	// Setup the SSL
     SSL* ssl=SSL_new(ctx);
 	if (!ssl)
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
 	printf("2.  Sending challenge to the server...\n");
 	
 	unsigned char rbuf[16];
-	//RAND_seed(rbuf, 16);
+	RAND_seed(rbuf, 16);
 	//int bits = 16;
 	//unsigned long e = 3;
 	
@@ -118,34 +118,79 @@ int main(int argc, char** argv)
 	//	printf("rsa key = %d\n", rsa);
 //
 	FILE *pubfile = fopen("rsapublickey.pem", "r");
-	RSA* pubkey = 0;
-	pubkey = PEM_read_RSAPublicKey(pubfile, NULL, NULL, NULL);
+	RSA* pubkey = PEM_read_RSA_PUBKEY(pubfile, NULL, NULL, NULL);
+	//char* test = "RoR!";
+	int randnum = rbuf[0];
+	//RAND_seed(test, 16);
+	unsigned char* enc = (unsigned char*)malloc(RSA_size(pubkey));
+		
+		printf("%i\n", randnum);
+		if (pubkey == NULL){
+			printf("Failed pubkey read!");
+		}
+		
+	int bufsize = RSA_public_encrypt(strlen((const char*)rbuf), (const unsigned char*)rbuf, (unsigned char*) enc, pubkey, RSA_PKCS1_PADDING);
+	if (bufsize == -1){
+		printf("Failed encryption!\n");
+		RSA_free(pubkey);
+	}
+		printf("encrypted: %i \n", enc[0]);
+	int challenge = enc[0];
 
-	unsigned char enc[16];
+	//------------------------------------------------------------------
 	
-	RSA_public_encrypt(sizeof(rbuf), rbuf, enc, pubkey, RSA_PKCS1_PADDING);
-
+	FILE *privfile = fopen("rsaprivatekey.pem", "r");
+	RSA* privkey = PEM_read_RSAPrivateKey(privfile, NULL, NULL, NULL);
+	unsigned char* dec = (unsigned char*)malloc(RSA_size(privkey));
+	
+	if (RSA_private_decrypt(RSA_size(privkey), enc, (unsigned char*)dec, privkey, RSA_PKCS1_PADDING) == -1){
+		printf("Failed decryption!\n");
+		RSA_free(pubkey);
+	}
+	
+	printf("decrypted: %i\n", dec[0]);
+	
 	//for (int i = 0; i < sizeof(enc); i++){
 	//	printf("%i\n", enc[i]);
 	//}
 	RSA_free(pubkey);
+		RSA_free(privkey);
+	
 //
 
-    string randomNumber="31337";
+    //string randomNumber="31337";
        	//int challenge  = rbuf[rand() % sizeof(rbuf)];
-    	//stringstream ss;
-    	//ss << challenge;
-	//string randomNumber = ss.str();
-		printf("Challenge: %s \n", randomNumber.c_str());
+    	stringstream ss;
+    	ss << challenge;
+	string randomNumber = ss.str();
+		//printf("Challenge: %s \n", randomNumber.c_str());
+		//printf("Challenge: %s \n", enc);
 	//SSL_write
-	int bufsize = strlen(randomNumber.c_str());
-		printf("bufsize: %i \n", bufsize);
-	//int bufsize = 1024;	
-	SSL_write(ssl, randomNumber.c_str(), bufsize);
-	printf("HELLO");
+	//int sendsize = strlen(randomNumber.c_str());
+		//printf("sendsize: %i \n", sendsize);
+	//int sendsize = 1024;
+	char* sendstring;
+	strcpy(sendstring, randomNumber.c_str());
+	printf("c string: %s\n", sendstring);
+		printf("size of buf: %i\n", bufsize);
+	SSL_write(ssl, enc, bufsize);
+	
     printf("SUCCESS.\n");
-	printf("    (Challenge sent: \"%s\")\n", randomNumber.c_str());
+	printf("    (Challenge sent: \"%s\")\n", sendstring);
 
+	//SHA1--------------------------------------------------
+	unsigned char obuf[20];
+	int deChallenge = dec[0];
+	stringstream dd;
+	dd << deChallenge;
+	string plainNum = dd.str();
+		printf("hashing: %s\n", plainNum.c_str());
+	SHA1((unsigned char*)plainNum.c_str(), sizeof(plainNum.c_str()), obuf);
+	
+	printf("hash:\n");
+	for (int i = 0; i < 20; i++){
+		printf("%02x ", obuf[i]);
+	}
     //-------------------------------------------------------------------------
 	// 3a. Receive the signed key from the server
 	printf("3a. Receiving signed key from server...");
@@ -155,6 +200,7 @@ int main(int argc, char** argv)
 	//SSL_read;
 
 	printf("RECEIVED.\n");
+
 	printf("    (Signature: \"%s\" (%d bytes))\n", buff2hex((const unsigned char*)buff, len).c_str(), len);
 
     //-------------------------------------------------------------------------
@@ -201,6 +247,7 @@ int main(int argc, char** argv)
     //-------------------------------------------------------------------------
 	// 6. Close the connection
 	printf("6.  Closing the connection...");
+
 
 	//SSL_shutdown
 	
