@@ -45,7 +45,9 @@ int main(int argc, char** argv)
 
     //-------------------------------------------------------------------------
 	// 1. Allow for a client to establish an SSL connection
-	printf("1. Allowing for client SSL connection...");
+	printf("1. Allowing for client SSL connection...\n");
+		printf("SERVER STEP 1: WAIT FOR CLIENT CONNECTION REQUEST AND ESTABLISH\n");
+		/*		Wait for client to request connection		*/
 
 	// Setup DH object and generate Diffie-Helman Parameters
 	DH* dh = DH_generate_parameters(128, 5, NULL, NULL);
@@ -97,22 +99,24 @@ int main(int argc, char** argv)
 
     //-------------------------------------------------------------------------
 	// 2. Receive a random number (the challenge) from the client
-	printf("2. Waiting for client to connect and send challenge...");
+	printf("2. Waiting for client to connect and send challenge...\n");
+		printf("SERVER STEP 2: RECEIVE ENCRYPTED CHALLENGE AND DECRYPT WITH PRIVATE KEY\n");
+		/*		Decrypt the received challenge			*/
     
     //SSL_read
     string randomNumber="";
-	
+
 	FILE *pubfile = fopen("rsapublickey.pem", "r");
 	RSA* pubkey = PEM_read_RSA_PUBKEY(pubfile, NULL, NULL, NULL);
     
     	unsigned char* buf = (unsigned char*)malloc(RSA_size(pubkey));
     	int bufsize = 128;
-    		printf("size of buf: %i\n", sizeof(buf));
+    		//printf("size of buf: %i\n", sizeof(buf));
 	SSL_read(ssl, buf, bufsize);
-		for(int x = 0; x < bufsize; x++){
+		//for(int x = 0; x < bufsize; x++){
 		//	printf("%c", buf[x]);
-			//randomNumber = randomNumber + buf[x];
-		}
+		//	randomNumber = randomNumber + buf[x];
+		//}
 	
     
 	printf("DONE.\n");
@@ -127,14 +131,17 @@ int main(int argc, char** argv)
 		printf("Failed decryption!\n");
 		fprintf(stderr, "OpenSSL error: %s\n", ERR_error_string(ERR_get_error(), NULL));
 		RSA_free(privkey);
+		exit(EXIT_FAILURE);
 	}
 	
-	printf("decrypted: %i\n", dec[0]);
+		printf("Decrypted value: %i\n", dec[0]);
 	
 
     //-------------------------------------------------------------------------
 	// 3. Generate the SHA1 hash of the challenge
 	printf("3. Generating SHA1 hash...\n");
+		printf("SERVER STEP 3: GENERATE HASH FROM CHALLENGE SHA1\n");
+		/*		Hash un-encrypted challenged with SHA1			*/
 
 	//BIO_new(BIO_s_mem());
 	//BIO_write
@@ -162,13 +169,14 @@ int main(int argc, char** argv)
 	string hash_string = "";
 
 	printf("SUCCESS.\n");
-	printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), mdlen);
+	//printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), mdlen);
 
     //-------------------------------------------------------------------------
 	// 4. Sign the key using the RSA private key specified in the
 	//     file "rsaprivatekey.pem"
-	printf("4. Signing the key...");
-
+	printf("4. Signing the key...\n");
+		printf("SERVER STEP 4: SIGNING THE HASH WITH PRIVATE KEY\n");
+		/*		Signing hash with private key for authentication client-side		*/
     //PEM_read_bio_RSAPrivateKey
     //RSA_private_encrypt
     
@@ -181,6 +189,7 @@ int main(int argc, char** argv)
     		printf("Failed sign!\n");
 		fprintf(stderr, "OpenSSL error: %s\n", ERR_error_string(ERR_get_error(), NULL));
 	    	RSA_free(privkey);
+		exit(EXIT_FAILURE);
 	}
 
     printf("DONE.\n");
@@ -189,7 +198,9 @@ int main(int argc, char** argv)
 
     //-------------------------------------------------------------------------
 	// 5. Send the signature to the client for authentication
-	printf("5. Sending signature to client for authentication...");
+	printf("5. Sending signature to client for authentication...\n");
+		printf("SERVER STEP 5: SEND SIGNED HASH TO CLIENT\n");
+		/*	Send hashed value to client for authentication		*/
 
 	//BIO_flush
 	//SSL_write
@@ -199,7 +210,9 @@ int main(int argc, char** argv)
     
     //-------------------------------------------------------------------------
 	// 6. Receive a filename request from the client
-	printf("6. Receiving file request from client...");
+	printf("6. Receiving file request from client...\n");
+		printf("SERVER STEP 6: RECEIVING FILE REQUEST FROM CLIENT\n");
+		/*		Get the name of the requested file from client			*/
 
     //SSL_read
     char file[BUFFER_SIZE];
@@ -215,7 +228,9 @@ int main(int argc, char** argv)
 
     //-------------------------------------------------------------------------
 	// 7. Send the requested file back to the client (if it exists)
-	printf("7. Attempting to send requested file to client...");
+	printf("7. Attempting to send requested file to client...\n");
+		printf("SERVER STEP 7: SEND ENTIRE FILE TO CLIENT\n");
+		/*		Send entire file to client		*/
 
 	PAUSE(2);
 	//BIO_flush
@@ -228,12 +243,12 @@ int main(int argc, char** argv)
 	bp = BIO_new_file((const char*)filename, "r");
 	
 	
-	int fileSize = BIO_read(bp, file, BUFFER_SIZE); //hardcoded sizes; succeeds
+	int fileSize = BIO_read(bp, file, BUFFER_SIZE); 
 	//int fileSize = 0;
 	//while(BIO_read(bp, file, 1) > 0){
 	//	fileSize++;
 	//}
-		printf("filesize: %i\n", fileSize);
+		//printf("filesize: %i\n", fileSize);
 
 	
     //int bytesSent=0;
@@ -246,7 +261,9 @@ int main(int argc, char** argv)
 
     //-------------------------------------------------------------------------
 	// 8. Close the connection
-	printf("8. Closing connection...");
+	printf("8. Closing connection...\n");
+		printf("SERVER STEP 8: CLOSING CONNECTION\n");
+		/*		Closing server SSL connection		*/
 
 	//SSL_shutdown
 	SSL_shutdown(ssl);
